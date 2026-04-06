@@ -5,6 +5,8 @@ import '../models/powerup.dart';
 import '../models/chest.dart';
 import '../widgets/skill_bar.dart';
 import '../widgets/chest_card.dart';
+import '../widgets/player_stats_card.dart';
+import '../widgets/game_button.dart';
 import 'race_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -147,10 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text(
-            "Skill Champs",
+            "🏆 Skill Champs",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 24,
+              fontSize: 22,
             ),
           ),
           centerTitle: true,
@@ -170,303 +172,163 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // 👤 PLAYER PROFILE CARD
-                  Card(
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Container(
+                  // 👤 PLAYER STATS CARD
+                  PlayerStatsCard(player: player),
+
+                  const SizedBox(height: 20),
+
+                  // ⚡ ACTIVE POWER-UP CARD
+                  if (widget.powerUp != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Colors.purple.shade400,
-                            Colors.purple.shade600,
+                            Colors.amber.shade300,
+                            Colors.amber.shade600,
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.2),
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 3,
-                              ),
-                            ),
-                            child: const Center(
-                              child: Text("🏆", style: TextStyle(fontSize: 48)),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            player.name,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              "Level ${player.level}",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // XP Progress Bar
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    "Experience",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    "${player.xp}/${player.maxXp}",
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: LinearProgressIndicator(
-                                  value: player.xp / player.maxXp,
-                                  minHeight: 8,
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.3),
-                                  valueColor: const AlwaysStoppedAnimation<Color>(
-                                    Colors.amber,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Stats Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildStatBubble(
-                                "💰",
-                                "${player.coins}",
-                                "Coins",
-                              ),
-                              _buildStatBubble(
-                                "🔥",
-                                "${player.totalPower}",
-                                "Power",
-                              ),
-                              _buildStatBubble(
-                                "⭐",
-                                "${player.level * 10}",
-                                "Score",
-                              ),
-                            ],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.shade700.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ⚡ ACTIVE POWER-UP
-                  if (widget.powerUp != null)
-                    Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.amber.shade300,
-                              Colors.amber.shade600,
-                            ],
+                      child: Row(
+                        children: [
+                          const Text(
+                            "⚡",
+                            style: TextStyle(fontSize: 36),
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.flash_on,
-                              color: Colors.white,
-                              size: 32,
-                            ),
-                            const SizedBox(width: 12),
-                            Column(
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   widget.powerUp!.name,
                                   style: const TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  "+${widget.powerUp!.value} boost active",
+                                  "Active in next race • +${widget.powerUp!.value} boost",
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: Colors.white70,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // 🎯 SKILLS SECTION
-                  const Text(
-                    "Your Skills",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SkillBar(
-                    skillName: "🏃 Speed",
-                    level: player.speed,
-                    color: Colors.orange.shade500,
-                    onUpgrade: () => setState(() {
-                      player.upgradeSpeed();
-                    }),
-                    canUpgrade: player.coins >= 20,
-                  ),
-                  const SizedBox(height: 12),
-                  SkillBar(
-                    skillName: "⛰️ Climb",
-                    level: player.climb,
-                    color: Colors.green.shade500,
-                    onUpgrade: () => setState(() {
-                      player.upgradeClimb();
-                    }),
-                    canUpgrade: player.coins >= 20,
-                  ),
-                  const SizedBox(height: 12),
-                  SkillBar(
-                    skillName: "🏊 Swim",
-                    level: player.swim,
-                    color: Colors.blue.shade500,
-                    onUpgrade: () => setState(() {
-                      player.upgradeSwim();
-                    }),
-                    canUpgrade: player.coins >= 20,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          "⚙️ Your Skills",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SkillBar(
+                        skillName: "🏃 Speed",
+                        level: player.speed,
+                        color: Colors.orange.shade500,
+                        onUpgrade: () => setState(() {
+                          player.upgradeSpeed();
+                        }),
+                        canUpgrade: player.coins >= 20,
+                      ),
+                      const SizedBox(height: 10),
+                      SkillBar(
+                        skillName: "⛰️ Climb",
+                        level: player.climb,
+                        color: Colors.green.shade500,
+                        onUpgrade: () => setState(() {
+                          player.upgradeClimb();
+                        }),
+                        canUpgrade: player.coins >= 20,
+                      ),
+                      const SizedBox(height: 10),
+                      SkillBar(
+                        skillName: "🏊 Swim",
+                        level: player.swim,
+                        color: Colors.blue.shade500,
+                        onUpgrade: () => setState(() {
+                          player.upgradeSwim();
+                        }),
+                        canUpgrade: player.coins >= 20,
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 24),
 
                   // 🎮 START MATCH BUTTON
-                  Container(
-                    width: double.infinity,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.green.shade400, Colors.green.shade700],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.shade700.withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: isMatchRunning ? null : _startMatch,
-                        borderRadius: BorderRadius.circular(16),
-                        child: Center(
-                          child: Text(
-                            isMatchRunning ? "⏳ Running..." : "🎮 Start Match",
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  GameButton(
+                    label: "Start Match",
+                    emoji: "🎮",
+                    onPressed: isMatchRunning ? () {} : _startMatch,
+                    color: Colors.green.shade500,
+                    enabled: !isMatchRunning,
+                    height: 56,
                   ),
 
                   const SizedBox(height: 16),
 
                   // 📢 RESULT MESSAGE
                   if (resultMessage.isNotEmpty)
-                    Card(
-                      elevation: 12,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    ScaleTransition(
+                      scale: AlwaysStoppedAnimation(1.0),
                       child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.shade300,
-                              Colors.blue.shade600,
-                            ],
+                            colors: resultMessage.contains("Victory")
+                                ? [Colors.green.shade400, Colors.green.shade600]
+                                : [Colors.red.shade400, Colors.red.shade600],
                           ),
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                            ),
+                          ],
                         ),
-                        padding: const EdgeInsets.all(20),
                         child: Center(
                           child: Text(
                             resultMessage,
                             style: const TextStyle(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -481,15 +343,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 📦 TREASURE CHESTS SECTION
                   if (chests.isNotEmpty)
                     Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          "🎁 Your Treasure Chests",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            "🎁 Your Treasure Chests",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         ...List.generate(chests.length, (index) {
                           return ChestCard(
                             chest: chests[index],
@@ -502,26 +368,41 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   else
                     Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          const Text(
-                            "🎁 No chests yet!",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Win matches to earn chests",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic,
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              "🎁",
+                              style: TextStyle(fontSize: 40),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            const Text(
+                              "No chests yet!",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Win matches to earn treasure chests",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -532,40 +413,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildStatBubble(String emoji, String value, String label) {
-    return Column(
-      children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
-          child: Center(
-            child: Text(emoji, style: const TextStyle(fontSize: 28)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.white70,
-          ),
-        ),
-      ],
     );
   }
 }

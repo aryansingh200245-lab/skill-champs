@@ -23,6 +23,7 @@ class RaceScreen extends StatefulWidget {
 class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
   late List<AnimationController> _playerControllers;
   late List<Animation<double>> _playerAnimations;
+  late AnimationController _confettiController;
 
   RaceStage currentStage = RaceStage.run;
   late List<Player> opponents;
@@ -37,6 +38,10 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _confettiController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
     _initializeRace();
   }
 
@@ -44,7 +49,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
     opponents = [
       widget.player,
       Player(
-        name: "Bot",
+        name: "Bot Challenger",
         speed: 7 + (widget.player.level ~/ 2),
         climb: 7 + (widget.player.level ~/ 2),
         swim: 7 + (widget.player.level ~/ 2),
@@ -55,7 +60,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
     _playerControllers = List.generate(
       opponents.length,
       (i) => AnimationController(
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 2),
         vsync: this,
       ),
     );
@@ -74,24 +79,34 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
   }
 
   void _startRace() async {
-    // Determine winner at start
+    // Determine winner upfront
     winnerIndex = MatchService.simulateRace(opponents, widget.powerUp);
+
+    // Brief delay before starting animation
+    await Future.delayed(const Duration(milliseconds: 300));
 
     // Run through 3 stages: Run -> Climb -> Swim
     for (int stage = 0; stage < 3; stage++) {
       currentStage = RaceStage.values[stage];
 
-      // Get stage scores
-      List<double> scores =
-          MatchService.getStageScore(opponents, currentStage, widget.powerUp);
+      // Get stage scores for both players
+      List<double> scores = MatchService.getStageScore(
+        opponents,
+        currentStage,
+        widget.powerUp,
+      );
       double maxScore = scores.reduce((a, b) => a > b ? a : b);
 
-      // Set animation target based on score
+      // Animate progress for this stage
       for (int i = 0; i < _playerControllers.length; i++) {
         _playerControllers[i].reset();
-        // Slower players have slower animations
         double speedMultiplier = scores[i] / maxScore;
-        _playerAnimations[i] = Tween<double>(begin: playerProgress[i], end: playerProgress[i] + (0.33 * speedMultiplier)).animate(
+        double stageProgress = 0.33 * speedMultiplier;
+
+        _playerAnimations[i] = Tween<double>(
+          begin: playerProgress[i],
+          end: playerProgress[i] + stageProgress,
+        ).animate(
           CurvedAnimation(
             parent: _playerControllers[i],
             curve: Curves.easeInOut,
@@ -102,7 +117,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
       // Run animations in parallel
       await Future.wait(_playerControllers.map((c) => c.forward()));
 
-      // Update progress
+      // Update progress after stage completes
       setState(() {
         for (int i = 0; i < opponents.length; i++) {
           playerProgress[i] = _playerAnimations[i].value;
@@ -110,31 +125,41 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
         stageIndex = stage + 1;
       });
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Haptic feedback at end of each stage
+      if (stage < 2) {
+        await HapticFeedback.lightImpact();
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
     }
 
-    // Finish race
+    // Race finished - show result
     setState(() {
       currentStage = RaceStage.finished;
       raceFinished = true;
     });
 
-    // Haptic feedback
-    await HapticFeedback.mediumImpact();
+    // Strong haptic for result
+    await HapticFeedback.heavyImpact();
 
+    // Show confetti animation for winner
+    if (winnerIndex == 0) {
+      _confettiController.forward();
+    }
+
+    // Wait before completing race
     await Future.delayed(const Duration(seconds: 2));
-    widget.onRaceComplete(winnerIndex!);
+
+    if (mounted) {
+      widget.onRaceComplete(winnerIndex!);
+    }
   }
 
   String getPlayerAvatar(int index) {
-    if (index == 0) return "🏆"; // Player avatar
-    return "🤖"; // AI avatar
+    return index == 0 ? "🏆" : "🤖";
   }
 
   Color getPlayerColor(int index) {
-    return index == 0
-        ? Colors.purple.shade500
-        : Colors.blue.shade500;
+    return index == 0 ? Colors.purple.shade500 : Colors.blue.shade500;
   }
 
   @override
@@ -142,6 +167,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
     for (var controller in _playerControllers) {
       controller.dispose();
     }
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -153,13 +179,13 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.purple.shade100, Colors.blue.shade100],
+            colors: [Colors.purple.shade200, Colors.blue.shade200],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // 🎬 STAGE HEADER
+              // HEADER
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -167,7 +193,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                     Text(
                       raceFinished ? "🏁 Race Complete!" : "🏁 Racing...",
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: Colors.purple.shade900,
                       ),
@@ -176,15 +202,15 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 8,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
-                            blurRadius: 4,
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
                           ),
                         ],
                       ),
@@ -195,6 +221,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                     ),
@@ -202,12 +229,11 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              // 🏃 RACE VISUALIZATION
+              // RACE VISUALIZATION
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Progress Bars
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Column(
@@ -216,88 +242,126 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                           final isWinner = raceFinished && index == winnerIndex;
 
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: getPlayerColor(index),
-                                        boxShadow: isWinner
-                                            ? [
-                                          BoxShadow(
-                                            color: Colors.amber,
-                                            blurRadius: 12,
-                                            spreadRadius: 2,
-                                          ),
-                                        ]
-                                            : null,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          getPlayerAvatar(index),
-                                          style: const TextStyle(
-                                            fontSize: 28,
+                            padding: const EdgeInsets.only(bottom: 24),
+                            child: ScaleTransition(
+                              scale: isWinner && raceFinished
+                                  ? Tween<double>(begin: 1.0, end: 1.08)
+                                      .animate(
+                                        CurvedAnimation(
+                                          parent: _confettiController,
+                                          curve: Curves.elasticOut,
+                                        ),
+                                      )
+                                  : AlwaysStoppedAnimation(1.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Player header
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 56,
+                                        height: 56,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: getPlayerColor(index),
+                                          boxShadow: isWinner
+                                              ? [
+                                                  BoxShadow(
+                                                    color: Colors.amber
+                                                        .withValues(alpha: 0.8),
+                                                    blurRadius: 16,
+                                                    spreadRadius: 4,
+                                                  ),
+                                                ]
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(alpha: 0.1),
+                                                    blurRadius: 4,
+                                                  ),
+                                                ],
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            getPlayerAvatar(index),
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            player.name,
-                                            style: const TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              player.name,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                             ),
+                                            const SizedBox(height: 3),
+                                            Text(
+                                              "Level ${player.level}",
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey.shade600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (raceFinished && isWinner)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
                                           ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            isWinner
-                                                ? "🥇 1st Place"
-                                                : "🥈 2nd Place",
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            "🥇 Winner",
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: isWinner
-                                                  ? Colors.amber.shade700
-                                                  : Colors.grey.shade600,
-                                              fontWeight: FontWeight.w600,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber.shade900,
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (isWinner)
-                                      const Text(
-                                        "👑",
-                                        style: TextStyle(fontSize: 24),
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: LinearProgressIndicator(
-                                    value: playerProgress[index],
-                                    minHeight: 12,
-                                    backgroundColor: Colors.grey.shade300,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(
-                                      getPlayerColor(index),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // Progress bar
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: LinearProgressIndicator(
+                                      value: playerProgress[index],
+                                      minHeight: 16,
+                                      backgroundColor: Colors.grey.shade300,
+                                      valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                            getPlayerColor(index),
+                                          ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "${(playerProgress[index] * 100).toStringAsFixed(0)}%",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         }),
@@ -307,20 +371,24 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              // 📊 STAGE PROGRESS
+              // STAGE TRACKER
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 child: Column(
                   children: [
                     const Text(
                       "Stages",
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.grey,
+                        letterSpacing: 0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: List.generate(3, (index) {
@@ -330,27 +398,44 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                         return Column(
                           children: [
                             Container(
-                              width: 50,
-                              height: 50,
+                              width: 52,
+                              height: 52,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: isCompleted || isActive
                                     ? Colors.purple.shade500
                                     : Colors.grey.shade300,
+                                boxShadow: isActive
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.purple
+                                              .withValues(alpha: 0.6),
+                                          blurRadius: 12,
+                                          spreadRadius: 2,
+                                        ),
+                                      ]
+                                    : null,
                               ),
                               child: Center(
-                                child: Text(
-                                  stageEmojis[index],
-                                  style: const TextStyle(fontSize: 24),
+                                child: AnimatedScale(
+                                  scale: isActive ? 1.2 : 1.0,
+                                  duration:
+                                      const Duration(milliseconds: 200),
+                                  child: Text(
+                                    stageEmojis[index],
+                                    style: const TextStyle(fontSize: 28),
+                                  ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               stageNames[index],
                               style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 11,
+                                fontWeight: isActive
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 color: isActive
                                     ? Colors.purple.shade900
                                     : Colors.grey,
@@ -364,7 +449,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
             ],
           ),
         ),

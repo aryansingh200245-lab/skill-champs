@@ -2,25 +2,67 @@ import 'package:flutter/material.dart';
 import '../models/powerup.dart';
 import 'home_screen.dart';
 
-class PowerUpScreen extends StatelessWidget {
-  PowerUpScreen({super.key});
+class PowerUpScreen extends StatefulWidget {
+  const PowerUpScreen({super.key});
+
+  @override
+  State<PowerUpScreen> createState() => _PowerUpScreenState();
+}
+
+class _PowerUpScreenState extends State<PowerUpScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  int? _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   final List<PowerUp> powers = [
-    PowerUp(id: 'speed_shoes', name: "Speed Shoes", type: "speed", value: 5),
-    PowerUp(id: 'climb_gloves', name: "Climb Gloves", type: "climb", value: 5),
-    PowerUp(id: 'swim_fins', name: "Swim Fins", type: "swim", value: 5),
+    PowerUp(
+      id: 'speed_shoes',
+      name: "Speed Shoes",
+      type: "speed",
+      value: 5,
+      rarity: PowerUpRarity.common,
+    ),
+    PowerUp(
+      id: 'climb_gloves',
+      name: "Climb Gloves",
+      type: "climb",
+      value: 5,
+      rarity: PowerUpRarity.common,
+    ),
+    PowerUp(
+      id: 'swim_fins',
+      name: "Swim Fins",
+      type: "swim",
+      value: 5,
+      rarity: PowerUpRarity.common,
+    ),
   ];
 
-  IconData getIcon(String type) {
+  String getDescription(String type) {
     switch (type) {
       case "speed":
-        return Icons.directions_run;
+        return "Boost your running shoes! +5 speed bonus.";
       case "climb":
-        return Icons.fitness_center;
+        return "Enhanced climbing gear! +5 climbing bonus.";
       case "swim":
-        return Icons.pool;
+        return "Pro swimming fins! +5 swimming bonus.";
       default:
-        return Icons.star;
+        return "Special boost!";
     }
   }
 
@@ -37,159 +79,217 @@ class PowerUpScreen extends StatelessWidget {
     }
   }
 
+  void _selectPowerUp(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    
+    // Delay navigation to show animation
+    Future.delayed(const Duration(milliseconds: 300), () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomeScreen(powerUp: powers[index]),
+        ),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "Skill Champs",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.purple.shade700,
-        elevation: 0,
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.purple.shade100, Colors.blue.shade100],
+            colors: [Colors.purple.shade700, Colors.blue.shade700],
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+        child: SafeArea(
           child: Column(
             children: [
-              // 🎮 TITLE
-              Column(
-                children: [
-                  const Icon(Icons.bolt, size: 48, color: Colors.amber),
-                  const SizedBox(height: 12),
-                  Text(
-                    "Select Your Power-Up",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.purple.shade900,
+              // 🎮 HEADER
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, -1),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: _animationController,
+                      curve: Curves.easeOut,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Choose a boost to help you win matches!",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      const Text(
+                        "⚡ Choose Your Weapon",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Pick a power-up to boost your next race!",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                          fontStyle: FontStyle.italic,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
 
-              const SizedBox(height: 30),
-
-              // 🎯 POWER-UP GRID
+              // 🎯 POWER-UP CARDS
               Expanded(
-                child: GridView.builder(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: powers.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
                   itemBuilder: (context, index) {
                     final power = powers[index];
+                    final isSelected = _selectedIndex == index;
+                    final delay = index * 100;
 
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => HomeScreen(powerUp: power),
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1, 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: _animationController,
+                          curve: Interval(
+                            delay / 800,
+                            (delay + 300) / 800,
+                            curve: Curves.easeOut,
                           ),
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              getColor(power.type),
-                              getColor(power.type).withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: GestureDetector(
+                        onTap: () => _selectPowerUp(index),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                getColor(power.type),
+                                getColor(power.type).withValues(alpha: 0.6),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            border: isSelected
+                                ? Border.all(
+                                    color: Colors.white,
+                                    width: 3,
+                                  )
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: getColor(power.type)
+                                    .withValues(alpha: isSelected ? 0.8 : 0.4),
+                                blurRadius: isSelected ? 20 : 12,
+                                spreadRadius: isSelected ? 2 : 0,
+                              ),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: getColor(power.type).withValues(alpha: 0.5),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      HomeScreen(powerUp: power),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
                               children: [
+                                // Emoji Icon
                                 Container(
-                                  width: 70,
-                                  height: 70,
+                                  width: 80,
+                                  height: 80,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.2),
+                                    color: Colors.white.withValues(alpha: 0.25),
                                   ),
                                   child: Center(
-                                    child: Icon(
-                                      getIcon(power.type),
-                                      size: 40,
-                                      color: Colors.white,
+                                    child: Text(
+                                      power.emoji,
+                                      style: const TextStyle(fontSize: 44),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  power.name,
-                                  style: const TextStyle(
+                                const SizedBox(width: 16),
+                                // Content
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              power.name,
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.3),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              power.rarityText,
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        getDescription(power.type),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.white70,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        "+${power.value} to ${power.type.toUpperCase()} stat",
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Checkmark
+                                if (isSelected)
+                                  const Icon(
+                                    Icons.check_circle,
                                     color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                                    size: 32,
                                   ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    "+${power.value} boost",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -200,35 +300,38 @@ class PowerUpScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 20),
-
-              // ℹ️ INFO TEXT
-              Container(
+              // ℹ️ FOOTER INFO
+              Padding(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      width: 1,
                     ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue.shade600),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        "Power-ups provide +5 stat boost to your selected skill during matches!",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade800,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: Colors.amber,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "Pick wisely! Your choice will affect the entire race outcome.",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
