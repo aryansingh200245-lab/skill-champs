@@ -1,94 +1,67 @@
 import '../models/player.dart';
 import '../models/powerup.dart';
+import 'race_engine.dart';
 
-enum RaceStage { run, climb, swim, fly, finished }
+export 'race_engine.dart' show RaceStage, RaceEngine, PlayerRaceState;
 
-class RaceData {
-  List<double> progress; // 0.0 to 1.0 for each player
-  RaceStage stage;
-  int? winnerIndex;
-
-  RaceData({
-    required this.progress,
-    required this.stage,
-    this.winnerIndex,
-  });
-}
-
+/// Match service handles game logic and race simulation
 class MatchService {
-  static int getWinnerIndex(List<Player> players, PowerUp powerUp, {String difficulty = 'Normal'}) {
-    int bestScore = -1;
-    int winnerIndex = 0;
+  /// Get stage-specific stat for a player (used for info display)
+  static double getStageRelevantStat(Player player, RaceStage stage, PowerUp powerUp, bool isPlayer) {
+    double stat = 0;
 
-    for (int i = 0; i < players.length; i++) {
-      Player p = players[i];
+    switch (stage) {
+      case RaceStage.run:
+        stat = player.speed.toDouble();
+        break;
+      case RaceStage.climb:
+        stat = player.climb.toDouble();
+        break;
+      case RaceStage.swim:
+        stat = player.swim.toDouble();
+        break;
+      case RaceStage.fly:
+        stat = player.fly.toDouble();
+        break;
+      case RaceStage.finished:
+        stat = 0;
+        break;
+    }
 
-      int score = p.speed + p.climb + p.swim + p.fly;
-
-      if (i == 0) {
-        if (powerUp.type == "speed") score += powerUp.value;
-        if (powerUp.type == "climb") score += powerUp.value;
-        if (powerUp.type == "swim") score += powerUp.value;
-        if (powerUp.type == "fly") score += powerUp.value;
-        if (powerUp.type == "shield") score += powerUp.value;
-        if (powerUp.type == "luck") score += (powerUp.value ~/ 2);
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        winnerIndex = i;
+    // Apply power-up if player is human and has relevant stage bonus
+    if (isPlayer) {
+      if (powerUp.type == "speed" && stage == RaceStage.run) {
+        stat += powerUp.value;
+      } else if (powerUp.type == "climb" && stage == RaceStage.climb) {
+        stat += powerUp.value;
+      } else if (powerUp.type == "swim" && stage == RaceStage.swim) {
+        stat += powerUp.value;
+      } else if (powerUp.type == "fly" && stage == RaceStage.fly) {
+        stat += powerUp.value;
+      } else if (powerUp.type == "shield") {
+        stat += (powerUp.value * 0.5); // Shield gives half bonus to all stages
       }
     }
 
-    return winnerIndex;
+    return stat;
   }
 
-  // Get stage scores for each player (returns speed for run, climb, swim, fly)
-  static List<double> getStageScore(List<Player> players, RaceStage stage, PowerUp powerUp) {
-    return List.generate(players.length, (i) {
-      Player p = players[i];
-      double score = 0;
-
-      if (stage == RaceStage.run) {
-        score = p.speed.toDouble();
-        if (i == 0 && powerUp.type == "speed") score += powerUp.value;
-      } else if (stage == RaceStage.climb) {
-        score = p.climb.toDouble();
-        if (i == 0 && powerUp.type == "climb") score += powerUp.value;
-      } else if (stage == RaceStage.swim) {
-        score = p.swim.toDouble();
-        if (i == 0 && powerUp.type == "swim") score += powerUp.value;
-      } else if (stage == RaceStage.fly) {
-        score = p.fly.toDouble();
-        if (i == 0 && powerUp.type == "fly") score += powerUp.value;
-      }
-
-      return score;
-    });
-  }
-
-  // Create AI opponent with difficulty scaling
-  static Player createAIOpponent(int playerLevel, String difficulty) {
-    int baseSkill = 7 + (playerLevel ~/ 2);
-
-    int aiSkillMultiplier = 1;
-    if (difficulty == 'Easy') aiSkillMultiplier = 0; // No scaling
-    if (difficulty == 'Normal') aiSkillMultiplier = 1; // +1 per level
-    if (difficulty == 'Hard') aiSkillMultiplier = 2; // +2 per level
-
-    return Player(
-      name: 'AI Bot',
-      speed: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
-      climb: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
-      swim: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
-      fly: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
-      level: playerLevel,
+  /// Create a real race engine for simulation
+  static RaceEngine createRaceEngine(List<Player> players, PowerUp powerUp) {
+    return RaceEngine(
+      players: players,
+      powerUp: powerUp,
     );
   }
 
-  // Simulate race and return winner
-  static int simulateRace(List<Player> players, PowerUp powerUp, {String difficulty = 'Normal'}) {
-    return getWinnerIndex(players, powerUp, difficulty: difficulty);
+  /// Simulate complete race and return winner
+  /// WARNING: This advances race to completion instantly
+  static int simulateRaceToEnd(List<Player> players, PowerUp powerUp) {
+    RaceEngine engine = RaceEngine(
+      players: players,
+      powerUp: powerUp,
+    );
+    return engine.simulateToEnd();
   }
 
   // Calculate match rewards based on difficulty
