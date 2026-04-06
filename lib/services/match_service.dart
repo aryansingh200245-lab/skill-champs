@@ -1,7 +1,7 @@
 import '../models/player.dart';
 import '../models/powerup.dart';
 
-enum RaceStage { run, climb, swim, finished }
+enum RaceStage { run, climb, swim, fly, finished }
 
 class RaceData {
   List<double> progress; // 0.0 to 1.0 for each player
@@ -23,12 +23,13 @@ class MatchService {
     for (int i = 0; i < players.length; i++) {
       Player p = players[i];
 
-      int score = p.speed + p.climb + p.swim;
+      int score = p.speed + p.climb + p.swim + p.fly;
 
       if (i == 0) {
         if (powerUp.type == "speed") score += powerUp.value;
         if (powerUp.type == "climb") score += powerUp.value;
         if (powerUp.type == "swim") score += powerUp.value;
+        if (powerUp.type == "fly") score += powerUp.value;
         if (powerUp.type == "shield") score += powerUp.value;
         if (powerUp.type == "luck") score += (powerUp.value ~/ 2);
       }
@@ -42,7 +43,7 @@ class MatchService {
     return winnerIndex;
   }
 
-  // Get stage scores for each player (returns speed for run, climb, swim)
+  // Get stage scores for each player (returns speed for run, climb, swim, fly)
   static List<double> getStageScore(List<Player> players, RaceStage stage, PowerUp powerUp) {
     return List.generate(players.length, (i) {
       Player p = players[i];
@@ -57,6 +58,9 @@ class MatchService {
       } else if (stage == RaceStage.swim) {
         score = p.swim.toDouble();
         if (i == 0 && powerUp.type == "swim") score += powerUp.value;
+      } else if (stage == RaceStage.fly) {
+        score = p.fly.toDouble();
+        if (i == 0 && powerUp.type == "fly") score += powerUp.value;
       }
 
       return score;
@@ -77,6 +81,7 @@ class MatchService {
       speed: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
       climb: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
       swim: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
+      fly: baseSkill + (playerLevel ~/ aiSkillMultiplier).clamp(0, 20),
       level: playerLevel,
     );
   }

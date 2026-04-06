@@ -33,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
       speed: 10,
       climb: 8,
       swim: 6,
+      fly: 7,
       coins: 50,
       level: 1,
     );
@@ -290,6 +291,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.blue.shade500,
                         onUpgrade: () => setState(() {
                           player.upgradeSwim();
+                        }),
+                        canUpgrade: player.coins >= 20,
+                      ),
+                      const SizedBox(height: 10),
+                      SkillBar(
+                        skillName: "✈️ Fly",
+                        level: player.fly,
+                        color: Colors.purple.shade500,
+                        onUpgrade: () => setState(() {
+                          player.upgradeFly();
                         }),
                         canUpgrade: player.coins >= 20,
                       ),

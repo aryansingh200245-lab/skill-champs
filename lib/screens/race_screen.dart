@@ -33,10 +33,10 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
 
   // Race tracking
   List<double> playerProgress = [0.0, 0.0];
-  int currentSegmentIndex = 0; // 0 = Run, 1 = Climb, 2 = Swim
+  int currentSegmentIndex = 0; // 0 = Run, 1 = Climb, 2 = Swim, 3 = Fly
   
-  static const List<String> segmentNames = ['🏃 Run', '⛰️ Climb', '🏊 Swim'];
-  static const List<String> segmentEmojis = ['🏃', '⛰️', '🏊'];
+  static const List<String> segmentNames = ['🏃 Run', '⛰️ Climb', '🏊 Swim', '✈️ Fly'];
+  static const List<String> segmentEmojis = ['🏃', '⛰️', '🏊', '✈️'];
 
   @override
   void initState() {
@@ -53,6 +53,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
         speed: 7 + (widget.player.level ~/ 2),
         climb: 7 + (widget.player.level ~/ 2),
         swim: 7 + (widget.player.level ~/ 2),
+        fly: 7 + (widget.player.level ~/ 2),
         level: widget.player.level,
       ),
     ];
@@ -60,9 +61,9 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
     // Determine winner BEFORE animation starts
     winnerIndex = MatchService.simulateRace(opponents, widget.powerUp);
 
-    // Create main race animation (4.5 seconds for smooth racing)
+    // Create main race animation (6 seconds for 4 stages smooth racing)
     _raceController = AnimationController(
-      duration: const Duration(milliseconds: 4500),
+      duration: const Duration(milliseconds: 6000),
       vsync: this,
     );
 
@@ -81,8 +82,8 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
     // Small delay before race starts
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // Run the 3 segments with smooth animation
-    for (int segment = 0; segment < 3; segment++) {
+    // Run the 4 segments with smooth animation
+    for (int segment = 0; segment < 4; segment++) {
       currentStage = RaceStage.values[segment];
 
       // Get scores for this segment
@@ -96,7 +97,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
       double maxScore = scores.reduce((a, b) => a > b ? a : b);
 
       // Calculate segment duration based on difficulty
-      // Segment 1: 1.5 sec, Segment 2: 1.5 sec, Segment 3: 1.5 sec = 4.5 sec total
+      // Segment 1: 1.5 sec, Segment 2: 1.5 sec, Segment 3: 1.5 sec, Segment 4: 1.5 sec = 6 sec total
       const int segmentDurationMs = 1500;
 
       // Create segment-specific animation
@@ -104,7 +105,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
         2,
         (i) {
           double speedMultiplier = scores[i] / maxScore;
-          double segmentDistance = 0.333; // Each segment is 1/3 of track
+          double segmentDistance = 0.25; // Each segment is 1/4 of track
 
           return Tween<double>(
             begin: playerProgress[i],
@@ -113,8 +114,8 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
             CurvedAnimation(
               parent: _raceController,
               curve: Interval(
-                segment / 3.0,
-                (segment + 1) / 3.0,
+                segment / 4.0,
+                (segment + 1) / 4.0,
                 curve: Curves.easeInOut,
               ),
             ),
@@ -126,7 +127,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
       _playerAnimations = segmentAnimations;
 
       // Haptic feedback for segment start
-      if (segment < 3) {
+      if (segment < 4) {
         await HapticFeedback.lightImpact();
       }
 
@@ -144,7 +145,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
       }
 
       // Small delay between segments
-      if (segment < 2) {
+      if (segment < 3) {
         await Future.delayed(const Duration(milliseconds: 200));
       }
     }
@@ -183,6 +184,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
           speed: widget.player.speed,
           climb: widget.player.climb,
           swim: widget.player.swim,
+          fly: widget.player.fly,
           coins: widget.player.coins,
           level: widget.player.level,
           xp: widget.player.xp,
@@ -282,7 +284,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
           if (!raceFinished) const SizedBox(height: 8),
           if (!raceFinished)
             Text(
-              segmentNames[currentSegmentIndex.clamp(0, 2)],
+              segmentNames[currentSegmentIndex.clamp(0, 3)],
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -299,7 +301,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: List.generate(3, (index) {
+        children: List.generate(4, (index) {
           bool isActive = currentSegmentIndex == index;
           bool isCompleted = currentSegmentIndex > index;
 

@@ -3,6 +3,7 @@ class Player {
   int speed;
   int climb;
   int swim;
+  int fly;
   int coins;
   int level;
   int xp;
@@ -18,6 +19,7 @@ class Player {
     required this.speed,
     required this.climb,
     required this.swim,
+    required this.fly,
     this.coins = 0,
     this.level = 1,
     this.xp = 0,
@@ -29,7 +31,7 @@ class Player {
     this.skillUpgradeCount = 0,
   }) : joinedDate = joinedDate ?? DateTime.now();
 
-  int get totalPower => speed + climb + swim;
+  int get totalPower => speed + climb + swim + fly;
 
   double get winRate => totalMatches == 0 ? 0 : (wins / totalMatches);
 
@@ -73,6 +75,14 @@ class Player {
   void upgradeSwim() {
     if (coins >= 20 && swim < 30) {
       swim += 1;
+      coins -= 20;
+      skillUpgradeCount += 1;
+    }
+  }
+
+  void upgradeFly() {
+    if (coins >= 20 && fly < 30) {
+      fly += 1;
       coins -= 20;
       skillUpgradeCount += 1;
     }
