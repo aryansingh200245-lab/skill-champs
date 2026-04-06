@@ -5,8 +5,9 @@ import '../models/powerup.dart';
 import '../models/chest.dart';
 import '../widgets/skill_bar.dart';
 import '../widgets/chest_card.dart';
-import '../widgets/player_stats_card.dart';
+import '../widgets/game_dashboard.dart';
 import '../widgets/game_button.dart';
+import '../widgets/chest_opening_dialog.dart';
 import 'race_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -126,15 +127,21 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    setState(() {
-      chest.isOpened = true;
-      player.coins += chest.reward;
-    });
-
-    await HapticFeedback.lightImpact();
+    // Show opening dialog with animation
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("🎁 +${chest.reward} coins!")),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ChestOpeningDialog(
+          chest: chest,
+          onComplete: () {
+            // Update player coins and mark chest as opened
+            setState(() {
+              chest.isOpened = true;
+              player.coins += chest.reward;
+            });
+          },
+        ),
       );
     }
   }
@@ -177,8 +184,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // 👤 PLAYER STATS CARD
-                  PlayerStatsCard(player: player),
+                  // 👤 GAME DASHBOARD
+                  GameDashboard(player: player),
 
                   const SizedBox(height: 20),
 
