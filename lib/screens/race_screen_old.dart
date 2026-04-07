@@ -545,7 +545,7 @@ class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
                                       curve: Curves.elasticOut),
                                 ),
                               )
-                            : AlwaysStoppedAnimation(1.0),
+                            : const AlwaysStoppedAnimation(1.0),
                         child: Container(
                           width: 50,
                           height: 50,

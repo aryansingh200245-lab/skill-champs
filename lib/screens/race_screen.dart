@@ -5,6 +5,7 @@ import '../models/player.dart';
 import '../models/powerup.dart';
 import '../models/chest.dart';
 import '../services/match_service.dart';
+import '../widgets/race_stats_comparison.dart';
 import 'race_result_screen.dart';
 
 class RaceScreen extends StatefulWidget {
@@ -208,7 +209,18 @@ class _RaceScreenState extends State<RaceScreen> {
 
               // Segment indicators
               _buildSegmentIndicators(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Real-time stat comparison
+              RaceStatsComparison(
+                player: widget.player,
+                opponent: opponent,
+                currentStage: raceEngine.currentStage,
+                playerProgress: playerProgress,
+                leaderIndex: leaderIndex,
+                raceStarted: raceStarted,
+              ),
+              const SizedBox(height: 16),
 
               // Race track
               Expanded(child: _buildRaceTrack()),
@@ -265,7 +277,7 @@ class _RaceScreenState extends State<RaceScreen> {
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: Colors.purple.shade500.withOpacity(0.5),
+                          color: Colors.purple.shade500.withAlpha((0.5 * 255).toInt()),
                           blurRadius: 12,
                           spreadRadius: 2,
                         ),
@@ -336,7 +348,7 @@ class _RaceScreenState extends State<RaceScreen> {
                   boxShadow: isLeader
                       ? [
                           BoxShadow(
-                            color: _getPlayerColor(index).withOpacity(0.6),
+                            color: _getPlayerColor(index).withAlpha((0.6 * 255).toInt()),
                             blurRadius: 16,
                             spreadRadius: 2,
                           ),
@@ -387,10 +399,10 @@ class _RaceScreenState extends State<RaceScreen> {
           Container(
             height: trackHeight,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withAlpha((0.5 * 255).toInt()),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _getPlayerColor(index).withOpacity(0.3),
+                color: _getPlayerColor(index).withAlpha((0.3 * 255).toInt()),
                 width: 2,
               ),
             ),
@@ -435,7 +447,7 @@ class _RaceScreenState extends State<RaceScreen> {
                         boxShadow: isWinner
                             ? [
                                 BoxShadow(
-                                  color: Colors.amber.withOpacity(0.6),
+                                  color: Colors.amber.withAlpha((0.6 * 255).toInt()),
                                   blurRadius: 12,
                                 ),
                               ]

@@ -187,7 +187,7 @@ class _MainMenuScreenState extends State<MainMenuScreen>
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => PowerUpScreen(),
+                                builder: (_) => const PowerUpScreen(),
                               ),
                             );
                           },

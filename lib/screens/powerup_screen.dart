@@ -122,9 +122,9 @@ class _PowerUpScreenState extends State<PowerUpScreen>
                       curve: Curves.easeOut,
                     ),
                   ),
-                  child: Column(
+                  child: const Column(
                     children: [
-                      const Text(
+                      Text(
                         "⚡ Choose Your Weapon",
                         style: TextStyle(
                           fontSize: 28,
@@ -133,7 +133,7 @@ class _PowerUpScreenState extends State<PowerUpScreen>
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Text(
                         "Pick a power-up to boost your next race!",
                         style: TextStyle(
@@ -264,7 +264,7 @@ class _PowerUpScreenState extends State<PowerUpScreen>
                                       const SizedBox(height: 6),
                                       Text(
                                         getDescription(power.type),
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontSize: 13,
                                           color: Colors.white70,
                                         ),
@@ -313,14 +313,14 @@ class _PowerUpScreenState extends State<PowerUpScreen>
                       width: 1,
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(
                         Icons.lightbulb_outline,
                         color: Colors.amber,
                         size: 20,
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           "Pick wisely! Your choice will affect the entire race outcome.",

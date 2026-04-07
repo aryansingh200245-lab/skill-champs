@@ -49,11 +49,11 @@ class RaceEngine {
   bool raceComplete = false;
 
   // Configuration
-  static const double TICK_RATE = 0.016; // ~60 FPS (16ms per tick)
-  static const double SEGMENT_DISTANCE = 1.0; // Each segment is 1.0 units
-  static const double BASE_VELOCITY = 0.5; // Base movement per tick
-  static const double VELOCITY_VARIANCE = 0.15; // Random velocity variance
-  static const double OVERTAKE_MARGIN = 0.03; // How close before overtake is possible
+  static const double tickRate = 0.016; // ~60 FPS (16ms per tick)
+  static const double segmentDistance = 1.0; // Each segment is 1.0 units
+  static const double baseVelocity = 0.5; // Base movement per tick
+  static const double velocityVariance = 0.15; // Random velocity variance
+  static const double overtakeMargin = 0.03; // How close before overtake is possible
 
   RaceEngine({
     required this.players,
@@ -125,10 +125,10 @@ class RaceEngine {
     double statRatio = statWithBonus / 10.0;
 
     // Calculate velocity: higher stats move faster
-    double baseVel = BASE_VELOCITY * statRatio;
+    double baseVel = baseVelocity * statRatio;
 
     // Add slight randomness for realism and tension
-    double variance = VELOCITY_VARIANCE * random.nextDouble() - (VELOCITY_VARIANCE / 2);
+    double variance = velocityVariance * random.nextDouble() - (velocityVariance / 2);
     double finalVel = baseVel + variance;
 
     // Clamp to reasonable values
@@ -140,7 +140,7 @@ class RaceEngine {
   bool simulateTick() {
     if (raceComplete) return true;
 
-    raceTime += TICK_RATE;
+    raceTime += tickRate;
 
     // Update each player's position
     for (int i = 0; i < playerStates.length; i++) {
@@ -151,11 +151,11 @@ class RaceEngine {
       playerStates[i].currentVelocity = velocity;
 
       // Move player
-      playerStates[i].position += velocity * TICK_RATE;
+      playerStates[i].position += velocity * tickRate;
 
       // Check if segment completed
-      if (playerStates[i].position >= SEGMENT_DISTANCE) {
-        playerStates[i].position = SEGMENT_DISTANCE;
+      if (playerStates[i].position >= segmentDistance) {
+        playerStates[i].position = segmentDistance;
         playerStates[i].segmentCompleted = true;
       }
     }
@@ -238,7 +238,7 @@ class RaceEngine {
 
         bool wasLeading = previousProgress[i] > previousProgress[j];
         bool isLeading = currentProgress[i] > currentProgress[j];
-        bool veryClose = (currentProgress[i] - currentProgress[j]).abs() < OVERTAKE_MARGIN;
+        bool veryClose = (currentProgress[i] - currentProgress[j]).abs() < overtakeMargin;
 
         if (wasLeading && !isLeading && veryClose) {
           return true;

@@ -324,7 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 📢 RESULT MESSAGE
                   if (resultMessage.isNotEmpty)
                     ScaleTransition(
-                      scale: AlwaysStoppedAnimation(1.0),
+                      scale: const AlwaysStoppedAnimation(1.0),
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(16),
