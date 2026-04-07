@@ -24,10 +24,11 @@ class RaceScreen extends StatefulWidget {
   State<RaceScreen> createState() => _RaceScreenState();
 }
 
-class _RaceScreenState extends State<RaceScreen> {
+class _RaceScreenState extends State<RaceScreen> with TickerProviderStateMixin {
   late Player opponent;
   late RaceEngine raceEngine;
   late Timer raceTickTimer;
+  late AnimationController _animationController;
 
   // Race state
   List<double> playerProgress = [0.0, 0.0];
@@ -38,6 +39,9 @@ class _RaceScreenState extends State<RaceScreen> {
   bool raceFinished = false;
   bool overtakeHappened = false;
   List<double> previousProgress = [0.0, 0.0];
+  int leadChangeCount = 0;
+  double playerMargin = 0.0;
+  int currentSegment = 0;
 
   static const List<String> segmentEmojis = ['🏃', '⛰️', '🏊', '✈️'];
   static const List<String> segmentNames = ['Run', 'Climb', 'Swim', 'Fly'];
@@ -45,6 +49,10 @@ class _RaceScreenState extends State<RaceScreen> {
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..repeat(reverse: true);
     _setupRace();
   }
 
@@ -99,11 +107,18 @@ class _RaceScreenState extends State<RaceScreen> {
           segmentProgress = raceEngine.getSegmentProgress();
           leaderIndex = raceEngine.getLeaderIndex();
           overtakeHappened = hadOvertake;
-          previousProgress = List.from(currentProgress);
-
-          if (hadOvertake) {
+          currentSegment = raceEngine.currentSegmentIndex;
+          
+          // Calculate margin (difference in progress)
+          playerMargin = (playerProgress[0] - playerProgress[1]).abs();
+          
+          // Track overtakes
+          if (hadOvertake && previousProgress.isNotEmpty) {
+            leadChangeCount++;
             HapticFeedback.mediumImpact();
           }
+          
+          previousProgress = List.from(currentProgress);
         });
 
         if (isComplete) {
@@ -175,6 +190,7 @@ class _RaceScreenState extends State<RaceScreen> {
   @override
   void dispose() {
     raceTickTimer.cancel();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -187,6 +203,35 @@ class _RaceScreenState extends State<RaceScreen> {
 
   String _getPlayerName(int index) {
     return index == 0 ? widget.player.name : opponent.name;
+  }
+
+  String _getSegmentName(int segment) {
+    if (segment < 0 || segment >= segmentNames.length) return "Unknown";
+    return segmentNames[segment];
+  }
+
+  String _getMarginEmoji() {
+    if (playerMargin < 0.03) {
+      return "🔥"; // Dead heat
+    } else if (playerMargin < 0.08) {
+      return "⚡"; // Close
+    } else if (playerProgress[0] > playerProgress[1]) {
+      return "🏃"; // Leading
+    } else {
+      return "🔄"; // Trailing
+    }
+  }
+
+  String _getMarginStatus() {
+    if (playerMargin < 0.03) {
+      return "DEAD HEAT!";
+    } else if (playerMargin < 0.08) {
+      return "NECK AND NECK!";
+    } else if (playerProgress[0] > playerProgress[1]) {
+      return "You're Leading";
+    } else {
+      return "Catching Up";
+    }
   }
 
   @override
@@ -239,18 +284,62 @@ class _RaceScreenState extends State<RaceScreen> {
     String headerText = !raceStarted
         ? "🏁 Ready..."
         : raceFinished
-            ? "🏁 Race Complete!"
-            : "🏁 Racing - ${segmentNames[raceEngine.currentSegmentIndex]}";
+            ? "� FINISH LINE!"
+            : "🏁 ${segmentEmojis[raceEngine.currentSegmentIndex]} ${segmentNames[raceEngine.currentSegmentIndex]}";
+
+    // Dynamic race story based on margin
+    String storyText = "";
+    if (raceStarted && !raceFinished) {
+      double margin = (playerProgress[0] - playerProgress[1]).abs();
+      if (margin > 0.2) {
+        storyText = playerProgress[0] > playerProgress[1] 
+            ? "You're dominating! 💪" 
+            : "Opponent is crushing it! 😰";
+      } else if (margin > 0.1) {
+        storyText = playerProgress[0] > playerProgress[1]
+            ? "You have the lead!"
+            : "Opponent ahead...";
+      } else if (margin > 0.03) {
+        storyText = "Neck and neck! 🔥";
+      } else {
+        storyText = "DEAD HEAT! ⚡️";
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Text(
-        headerText,
-        style: TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.bold,
-          color: Colors.purple.shade900,
-        ),
+      child: Column(
+        children: [
+          Text(
+            headerText,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.purple.shade900,
+            ),
+          ),
+          if (storyText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: (playerProgress[0] > playerProgress[1] 
+                    ? Colors.green : Colors.red).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                storyText,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: playerProgress[0] > playerProgress[1]
+                    ? Colors.green.shade700
+                    : Colors.red.shade700,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -263,23 +352,51 @@ class _RaceScreenState extends State<RaceScreen> {
         children: List.generate(4, (index) {
           bool isActive = raceEngine.currentSegmentIndex == index;
           bool isCompleted = raceEngine.currentSegmentIndex > index;
+          
+          // Get which stat dominates in this segment
+          int playerStat = 0, opponentStat = 0;
+          if (index == 0) {
+            playerStat = widget.player.speed;
+            opponentStat = opponent.speed;
+          } else if (index == 1) {
+            playerStat = widget.player.climb;
+            opponentStat = opponent.climb;
+          } else if (index == 2) {
+            playerStat = widget.player.swim;
+            opponentStat = opponent.swim;
+          } else {
+            playerStat = widget.player.fly;
+            opponentStat = opponent.fly;
+          }
+          
+          // Strong advantage color - red if player weak, green if player strong
+          Color indicatorColor = Colors.grey.shade300;
+          if (isCompleted || isActive) {
+            if ((playerStat - opponentStat).abs() > 5) {
+              // Clear advantage to someone
+              indicatorColor = playerStat > opponentStat 
+                  ? Colors.green.shade500 
+                  : Colors.red.shade500;
+            } else {
+              // Balanced - orange for tension
+              indicatorColor = Colors.amber.shade500;
+            }
+          }
 
           return AnimatedScale(
-            scale: isActive ? 1.2 : 1.0,
-            duration: const Duration(milliseconds: 300),
+            scale: isActive ? 1.3 : 1.0,
+            duration: const Duration(milliseconds: 200),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: isCompleted || isActive
-                    ? Colors.purple.shade500
-                    : Colors.grey.shade300,
+                color: indicatorColor,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
-                          color: Colors.purple.shade500.withAlpha((0.5 * 255).toInt()),
-                          blurRadius: 12,
-                          spreadRadius: 2,
+                          color: indicatorColor.withAlpha((0.7 * 255).toInt()),
+                          blurRadius: 16,
+                          spreadRadius: 3,
                         ),
                       ]
                     : null,
@@ -288,15 +405,17 @@ class _RaceScreenState extends State<RaceScreen> {
                 children: [
                   Text(
                     segmentEmojis[index],
-                    style: const TextStyle(fontSize: 22),
+                    style: TextStyle(
+                      fontSize: isActive ? 26 : 22,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     segmentNames[index],
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
-                      color: isCompleted || isActive
+                      color: (isCompleted || isActive) && indicatorColor != Colors.grey.shade300
                           ? Colors.white
                           : Colors.grey.shade600,
                     ),
@@ -330,13 +449,34 @@ class _RaceScreenState extends State<RaceScreen> {
   Widget _buildPlayer(int index, double trackHeight, double playerSize) {
     final isWinner = raceFinished && index == winnerIndex;
     final isLeader = index == leaderIndex && raceStarted;
+    
+    // Calculate velocity indicator
+    List<PlayerRaceState> playerStates = raceEngine.getPlayerStates();
+    double velocityPercent = (playerStates[index].currentVelocity / 2.0).clamp(0.0, 1.0);
+    
+    // Get status text based on position
+    String statusText = "";
+    if (raceStarted && !raceFinished) {
+      double progress = playerProgress[index];
+      double otherProgress = playerProgress[1 - index];
+      
+      if (progress > 0.95) {
+        statusText = "🏁 ALMOST THERE!";
+      } else if ((progress - otherProgress).abs() < 0.05) {
+        statusText = "⚡ DEAD HEAT!";
+      } else if (progress > otherProgress) {
+        statusText = "💨 FAST!";
+      } else {
+        statusText = "🔥 CATCHING UP!";
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Player name
+          // Player header
           Row(
             children: [
               Container(
@@ -348,9 +488,9 @@ class _RaceScreenState extends State<RaceScreen> {
                   boxShadow: isLeader
                       ? [
                           BoxShadow(
-                            color: _getPlayerColor(index).withAlpha((0.6 * 255).toInt()),
-                            blurRadius: 16,
-                            spreadRadius: 2,
+                            color: _getPlayerColor(index).withAlpha((0.7 * 255).toInt()),
+                            blurRadius: 18,
+                            spreadRadius: 3,
                           ),
                         ]
                       : null,
@@ -370,17 +510,17 @@ class _RaceScreenState extends State<RaceScreen> {
                     Text(
                       _getPlayerName(index),
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (isLeader)
+                    if (statusText.isNotEmpty)
                       Text(
-                        "🥇 Leading",
+                        statusText,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.amber.shade600,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isLeader ? Colors.amber.shade600 : Colors.grey.shade600,
                         ),
                       ),
                   ],
@@ -389,11 +529,52 @@ class _RaceScreenState extends State<RaceScreen> {
               if (isWinner)
                 const Text(
                   "🏆",
-                  style: TextStyle(fontSize: 32),
+                  style: TextStyle(fontSize: 36),
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+
+          // Velocity indicator bar (showing how fast they're going)
+          if (raceStarted)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: LinearProgressIndicator(
+                            value: velocityPercent,
+                            minHeight: 4,
+                            backgroundColor: Colors.grey.shade300,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              velocityPercent > 0.7
+                                  ? Colors.red.shade500
+                                  : velocityPercent > 0.4
+                                      ? Colors.orange.shade500
+                                      : Colors.blue.shade500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${(velocityPercent * 100).toStringAsFixed(0)}%",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
           // Track visualization
           Container(
@@ -429,52 +610,81 @@ class _RaceScreenState extends State<RaceScreen> {
                   ),
                 ),
 
-                // Player progress indicator
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Align(
-                    alignment: Alignment(
-                      (playerProgress[index] * 2) - 1,
-                      0,
-                    ),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 100),
-                      width: playerSize,
-                      height: trackHeight - 16,
-                      decoration: BoxDecoration(
-                        color: _getPlayerColor(index),
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: isWinner
-                            ? [
-                                BoxShadow(
-                                  color: Colors.amber.withAlpha((0.6 * 255).toInt()),
-                                  blurRadius: 12,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              index == 0 ? "👤" : "🤖",
-                              style: const TextStyle(fontSize: 28),
+                // Calculate progress difference for fighting animation
+                Builder(
+                  builder: (context) {
+                    double otherProgress = playerProgress[1 - index];
+                    double progressDiff = (playerProgress[index] - otherProgress).abs();
+                    bool isNeckAndNeck = progressDiff < 0.08 && raceStarted && !raceFinished;
+
+                    // Player progress indicator
+                    return Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Align(
+                        alignment: Alignment(
+                          (playerProgress[index] * 2) - 1,
+                          0,
+                        ),
+                        child: ScaleTransition(
+                          scale: isNeckAndNeck
+                              ? Tween<double>(begin: 0.95, end: 1.05).animate(
+                                  CurvedAnimation(
+                                    parent: _animationController,
+                                    curve: Curves.easeInOut,
+                                  ),
+                                )
+                              : AlwaysStoppedAnimation(1.0),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            width: playerSize,
+                            height: trackHeight - 16,
+                            decoration: BoxDecoration(
+                              color: _getPlayerColor(index),
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: isNeckAndNeck
+                                  ? [
+                                      BoxShadow(
+                                        color: _getPlayerColor(index)
+                                            .withAlpha((0.6 * 255).toInt()),
+                                        blurRadius: 12,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
+                                  : isWinner
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.amber
+                                                .withAlpha((0.6 * 255).toInt()),
+                                            blurRadius: 12,
+                                          ),
+                                        ]
+                                      : null,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${(playerProgress[index] * 100).toStringAsFixed(0)}%",
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    index == 0 ? "👤" : "🤖",
+                                    style: const TextStyle(fontSize: 28),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "${(playerProgress[index] * 100).toStringAsFixed(0)}%",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
 
                 // Finish line
@@ -541,49 +751,171 @@ class _RaceScreenState extends State<RaceScreen> {
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      child: Column(
         children: [
-          _buildStatBubble(
-            "🏃 Speed",
-            "${MatchService.getStageRelevantStat(widget.player, RaceStage.run, widget.powerUp, true).toStringAsFixed(1)} vs ${MatchService.getStageRelevantStat(opponent, RaceStage.run, widget.powerUp, false).toStringAsFixed(1)}",
+          // Current segment and stage info
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.blue.shade200,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Stage ${currentSegment + 1}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _getSegmentName(currentSegment),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+                // Tension indicator
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "Tension",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 120,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Builder(
+                        builder: (context) {
+                          List<PlayerRaceState> playerStates =
+                              raceEngine.getPlayerStates();
+                          double tension =
+                              playerStates.isNotEmpty ? playerStates[0].tension : 0;
+                          return ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: tension.clamp(0.0, 1.0),
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                tension > 0.7
+                                    ? Colors.red.shade500
+                                    : tension > 0.4
+                                        ? Colors.orange.shade500
+                                        : Colors.green.shade500,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-          _buildStatBubble(
-            "⛰️ Climb",
-            "${MatchService.getStageRelevantStat(widget.player, RaceStage.climb, widget.powerUp, true).toStringAsFixed(1)} vs ${MatchService.getStageRelevantStat(opponent, RaceStage.climb, widget.powerUp, false).toStringAsFixed(1)}",
+          const SizedBox(height: 12),
+
+          // Current margin and lead status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.amber.shade200,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _getMarginEmoji(),
+                      style: const TextStyle(fontSize: 24),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getMarginStatus(),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.amber.shade700,
+                          ),
+                        ),
+                        Text(
+                          "${(playerMargin * 100).toStringAsFixed(1)}%",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.amber.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                // Overtake indicator
+                if (leadChangeCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade200,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "⚡",
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "$leadChangeCount overtakes",
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.purple.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatBubble(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey.shade700,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.purple.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

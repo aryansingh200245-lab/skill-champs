@@ -1,16 +1,24 @@
 import 'dart:math';
+import 'package:flutter/services.dart';
 import '../models/player.dart';
 import '../models/powerup.dart';
 
 enum RaceStage { run, climb, swim, fly, finished }
 
-/// Represents a player's state during a race segment
+/// Represents a player's state during a race segment with momentum physics
 class PlayerRaceState {
   double position; // 0.0 to 1.0 for segment progress
   double segmentStartPos; // Position when segment started
   RaceStage currentStage;
   bool segmentCompleted;
   double currentVelocity; // Distance per tick
+  
+  // Physics properties for dynamic racing
+  double acceleration = 0.0; // How fast they're speeding up/down
+  double momentum = 0.0; // Current momentum factor
+  int positionHistory = 0; // Track position changes for momentum
+  bool recovering = false; // Are they recovering from a bad segment start?
+  double tension = 0.0; // How tense the race is (0-1)
 
   PlayerRaceState({
     required this.position,
@@ -20,12 +28,15 @@ class PlayerRaceState {
     this.currentVelocity = 0.0,
   });
 
-  /// Reset for next segment
+  /// Reset for next segment with momentum carryover
   void nextSegment(RaceStage stage) {
     segmentStartPos = position;
     currentStage = stage;
     segmentCompleted = false;
-    currentVelocity = 0.0;
+    // Keep some momentum from previous segment (0.3x carryover)
+    momentum = momentum * 0.3;
+    tension = 0.0;
+    recovering = false;
   }
 
   /// Get total race progress (combining all segments)
@@ -34,7 +45,7 @@ class PlayerRaceState {
   }
 }
 
-/// Real-time race simulation engine
+/// Real-time race simulation engine with dynamic competitive physics
 class RaceEngine {
   final List<Player> players;
   final PowerUp powerUp;
@@ -44,16 +55,27 @@ class RaceEngine {
   late List<PlayerRaceState> playerStates;
   late int currentSegmentIndex;
   late RaceStage currentStage;
-  double raceTime = 0.0; // Total time elapsed
+  double raceTime = 0.0;
   int? winnerIndex;
   bool raceComplete = false;
+  
+  // Dynamic race state
+  int previousLeaderIndex = 0;
+  int leaderChangeCount = 0; // Track how many times lead has changed
+  List<double> segmentStartProgress = [0.0, 0.0]; // Progress at start of segment
 
-  // Configuration
-  static const double tickRate = 0.016; // ~60 FPS (16ms per tick)
-  static const double segmentDistance = 1.0; // Each segment is 1.0 units
-  static const double baseVelocity = 0.5; // Base movement per tick
-  static const double velocityVariance = 0.15; // Random velocity variance
-  static const double overtakeMargin = 0.03; // How close before overtake is possible
+  // Configuration with more dynamic values
+  static const double tickRate = 0.016; // 60 FPS
+  static const double segmentDistance = 1.0;
+  static const double baseVelocity = 0.5;
+  
+  // Enhanced physics for competitive racing
+  static const double velocityVariance = 0.20; // Increased from 0.15 for more unpredictability
+  static const double momentumBoost = 0.15; // Momentum acceleration from previous segment
+  static const double recoveryFactor = 0.08; // How fast late starters catch up
+  static const double overtakeMargin = 0.03;
+  static const double dragFactor = 0.05; // Slight drag on leads to allow comebacks
+  static const double accelerationFactor = 0.12; // How fast acceleration changes
 
   RaceEngine({
     required this.players,
@@ -114,72 +136,119 @@ class RaceEngine {
     return baseStat + bonus;
   }
 
-  /// Calculate velocity for a player in current segment
+  /// Calculate velocity for a player with dynamic momentum physics
   double _calculateVelocity(int playerIndex) {
     Player player = players[playerIndex];
-    int baseStat = _getStatForStage(player, currentStage);
-    double statWithBonus = _applyPowerUpBonus(playerIndex, baseStat.toDouble());
+    PlayerRaceState state = playerStates[playerIndex];
+    RaceStage stage = currentStage;
 
-    // Higher stat = higher velocity
-    // Normalize around base (10 is average)
+    // 1. Base stat for current segment
+    int baseStat = _getStatForStage(player, stage);
+    double statWithBonus = _applyPowerUpBonus(playerIndex, baseStat.toDouble());
     double statRatio = statWithBonus / 10.0;
 
-    // Calculate velocity: higher stats move faster
+    // 2. Calculate base velocity from stat
     double baseVel = baseVelocity * statRatio;
 
-    // Add slight randomness for realism and tension
-    double variance = velocityVariance * random.nextDouble() - (velocityVariance / 2);
-    double finalVel = baseVel + variance;
+    // 3. Add momentum from previous segment performance
+    double momentumAdjustment = state.momentum * momentumBoost;
 
-    // Clamp to reasonable values
+    // 4. Apply recovery factor if falling behind
+    double recoveryAdjustment = 0.0;
+    if (state.position < (segmentDistance * 0.4)) {
+      // If early in segment and not the leader, boost slightly
+      int leaderIdx = getLeaderIndex();
+      if (playerIndex != leaderIdx && state.position < playerStates[leaderIdx].position) {
+        recoveryAdjustment = recoveryFactor * (playerStates[leaderIdx].position - state.position);
+      }
+    }
+
+    // 5. Apply drag if way ahead (to create tension)
+    double dragAdjustment = 0.0;
+    if (state.position > (segmentDistance * 0.7)) {
+      int leaderIdx = getLeaderIndex();
+      if (playerIndex == leaderIdx) {
+        // Leader feels slight drag near the end
+        double marginToSecond = playerStates[leaderIdx].position - 
+            playerStates[(leaderIdx + 1) % playerStates.length].position;
+        if (marginToSecond > 0.1) {
+          dragAdjustment = -dragFactor * marginToSecond;
+        }
+      }
+    }
+
+    // 6. Add significant randomness for unpredictability
+    double randomVariance = velocityVariance * (random.nextDouble() - 0.5) * 2;
+    
+    // 7. Apply acceleration smoothing for momentum feel
+    double targetVelocity = baseVel + momentumAdjustment + recoveryAdjustment + dragAdjustment;
+    state.acceleration = (targetVelocity - state.currentVelocity) * accelerationFactor;
+    double finalVel = state.currentVelocity + state.acceleration + randomVariance;
+
+    // Clamp to reasonable range
     return finalVel.clamp(0.05, 2.0);
   }
 
-  /// Simulate one tick of the race
-  /// Returns true if race is complete
+  /// Simulate one tick with enhanced dynamic physics
   bool simulateTick() {
     if (raceComplete) return true;
 
     raceTime += tickRate;
 
-    // Update each player's position
+    // Store leader index for change detection
+    int prevLeader = getLeaderIndex();
+
+    // Update each player's position with dynamic velocity
     for (int i = 0; i < playerStates.length; i++) {
       if (playerStates[i].segmentCompleted) continue;
 
-      // Calculate velocity for this tick
       double velocity = _calculateVelocity(i);
       playerStates[i].currentVelocity = velocity;
-
-      // Move player
       playerStates[i].position += velocity * tickRate;
 
-      // Check if segment completed
+      // Check segment completion
       if (playerStates[i].position >= segmentDistance) {
         playerStates[i].position = segmentDistance;
         playerStates[i].segmentCompleted = true;
+        
+        // Store momentum for next segment (how hard they were pushing)
+        playerStates[i].momentum = (velocity / 2.0).clamp(0.0, 1.0);
       }
     }
 
+    // Check for overtakes and update tension
+    int currentLeader = getLeaderIndex();
+    if (currentLeader != prevLeader) {
+      leaderChangeCount++;
+      previousLeaderIndex = prevLeader;
+      // Apply haptic feedback for overtakes
+      HapticFeedback.mediumImpact();
+    }
+
+    // Calculate race tension (0 = predictable, 1 = very close)
+    double margin = (playerStates[0].position - playerStates[1].position).abs();
+    for (var state in playerStates) {
+      state.tension = 1.0 - (margin / 0.5).clamp(0.0, 1.0);
+    }
+
     // Check if all players completed current segment
-    bool allCompleted =
-        playerStates.every((state) => state.segmentCompleted);
+    bool allCompleted = playerStates.every((state) => state.segmentCompleted);
 
     if (allCompleted) {
-      // Move to next segment
       if (currentSegmentIndex < 3) {
+        // Move to next segment
         currentSegmentIndex++;
         currentStage = RaceStage.values[currentSegmentIndex];
+        segmentStartProgress = List.from(playerStates.map((s) => s.getTotalProgress(currentSegmentIndex)));
 
-        // Reset segment progress
         for (var state in playerStates) {
           state.nextSegment(currentStage);
         }
       } else {
-        // Race complete!
+        // Race complete - determine winner
         raceComplete = true;
         currentStage = RaceStage.finished;
 
-        // Determine winner (last player to finish total race)
         double maxTotal = -1;
         for (int i = 0; i < playerStates.length; i++) {
           double total = playerStates[i].getTotalProgress(4);
@@ -247,6 +316,11 @@ class RaceEngine {
     }
 
     return false;
+  }
+
+  /// Get player race states for UI feedback
+  List<PlayerRaceState> getPlayerStates() {
+    return playerStates;
   }
 
   /// Simulate entire race and return winner (for instant result if needed)
